@@ -1,14 +1,84 @@
 import datetime
+import json
+import logging
+import os
 import random
 import string
 from contextlib import contextmanager
 from enum import Enum
+from logging.config import dictConfig
 from pathlib import Path
 
 import yaml
 from flask import Flask, render_template, request, make_response
+from mailinglogger import MailingLogger
 
 app = Flask(__name__)
+
+dictConfig({
+    'version': 1,
+    'formatters': {'default': {
+        'format': '[%(asctime)s] %(levelname)s in %(module)s: %(message)s',
+    }},
+    'handlers': {'wsgi': {
+        'class': 'logging.StreamHandler',
+        'stream': 'ext://flask.logging.wsgi_errors_stream',
+        'formatter': 'default'
+    }},
+    'root': {
+        'level': 'INFO',
+        'handlers': ['wsgi']
+    }
+})
+
+logging_template = """<html><head><style>
+    tt {
+      padding: 0;
+      margin: 0;
+      color: #444444;
+    }
+    tt.WARNING {
+      color: #CC6600
+    }
+    tt.ERROR {
+      color: #990000
+    }
+    tt.CRITICAL {
+      color: #990000
+    }
+    </style></head>
+    <body><pre>%s</pre></body></html>
+"""
+
+_mail_enabled = os.environ.get("MAIL_ENABLED", default="false")
+MAIL_ENABLED = _mail_enabled.lower() in {"1", "t", "true"}
+MAIL_ADRES = os.environ.get("MAIL_ADRES", default=None)
+MAIL_HOST = os.environ.get("MAIL_HOST", default=None)
+MAIL_PORT = os.environ.get("MAIL_PORT", default=None)
+MAIL_SUBJECT = os.environ.get("MAIL_SUBJECT", default=None)
+MAIL_USERNAME = os.environ.get("MAIL_USERNAME", default=None)
+MAIL_PASSWORD = os.environ.get("MAIL_PASSWORD", default=None)
+
+if not app.debug and MAIL_ENABLED:
+    mail_handler = MailingLogger(
+        fromaddr=MAIL_ADRES,
+        toaddrs=[MAIL_ADRES],
+        mailhost=(MAIL_HOST, int(MAIL_PORT)),
+        subject=MAIL_SUBJECT,
+        username=MAIL_USERNAME,
+        password=MAIL_PASSWORD,
+        secure=True,
+        template=logging_template,
+        content_type='text/html'
+    )
+    mail_handler.setLevel(logging.INFO)
+    formatter = logging.Formatter(
+        '<tt class="%(levelname)s">%(asctime)s %(levelname)-8s %(message)s</tt>',
+        '%Y-%m-%d %H:%M:%S'
+    )
+    mail_handler.setFormatter(formatter)
+    app.logger.addHandler(mail_handler)
+    app.logger.info(f"Added mailinglogger for {[MAIL_ADRES]}")
 
 
 class ForbiddenReason(Enum):
@@ -79,7 +149,7 @@ def page():
 
         resp = make_response(render_template(f"pages/{config['pages'][page_item]['page']}"))
         exp = datetime.datetime.now()
-        exp.replace(year = exp.year + 1)
+        exp.replace(year=exp.year + 1)
         resp.set_cookie('super_secret', cookie, expires=exp, httponly=True)
         return resp
 
@@ -109,7 +179,7 @@ def forbidden(config, reason: ForbiddenReason):
             if cookie in config['pages'][config_name]['cookies']:
                 message['cookie_names'].append(config_name)
 
-    print(message)
+    app.logger.warning(f"Blocked request:\n\n{json.dumps(message, indent=4)}")
 
     return render_template('forbidden.html')
 

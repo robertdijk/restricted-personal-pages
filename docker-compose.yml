@@ -7,3 +7,11 @@ services:
       - ./static:/code/static
       - ./templates:/code/templates
       - ./config.yaml:/code/config.yaml
+    environment:
+      - MAIL_ENABLED=true
+      - MAIL_ADRES=test@example.com
+      - MAIL_HOST=mail.example.com
+      - MAIL_PORT=587
+      - MAIL_SUBJECT=log
+      - MAIL_USERNAME=test@example.com
+      - MAIL_PASSWORD=CHANGEME
