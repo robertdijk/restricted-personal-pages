@@ -1,0 +1,9 @@
+services:
+  web:
+    image: ghcr.io/robertdijk/restricted-personal-pages/restricted-personal-pages:latest
+    ports:
+      - "8000:5000"
+    volumes:
+      - ./static:/code/static
+      - ./templates:/code/templates
+      - ./config.yaml:/code/config.yaml
