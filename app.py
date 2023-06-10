@@ -1,3 +1,4 @@
+import datetime
 import random
 import string
 from contextlib import contextmanager
@@ -77,7 +78,9 @@ def page():
             config['pages'][page_item]['cookies'].append(cookie)
 
         resp = make_response(render_template(f"pages/{config['pages'][page_item]['page']}"))
-        resp.set_cookie('super_secret', cookie)
+        exp = datetime.datetime.now()
+        exp.replace(year = exp.year + 1)
+        resp.set_cookie('super_secret', cookie, expires=exp, httponly=True)
         return resp
 
 
